@@ -1,0 +1,314 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<style>:root{color-scheme:light}body{margin:0}[hidden]{display:none!important}img{max-width:100%}</style>
+<title>New Start Email Sorter</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Public+Sans:wght@400;500;600;700;800&display=swap">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js"></script>
+<style>
+/* Layout: one working column — drop zone, then a summary strip, then one panel per paper */
+:root{
+  --bg:#f3f4f2; --surface:#ffffff; --ink:#16181a; --muted:#5d6468; --line:#d9ddde; --soft:#eceeed;
+  --dh:#a30000; --tcr:#0f7f87; --tj:#5f79b3; --warn:#9a5b00; --warn-bg:#fff4e0; --ok:#226b3a;
+  --f-body:"Public Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --f-mono:"IBM Plex Mono",ui-monospace,"SFMono-Regular",Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#121415; --surface:#1b1e20; --ink:#eef0f0; --muted:#a3aaad; --line:#30363a; --soft:#24282b;
+  --dh:#ff5c5c; --tcr:#3cc3cc; --tj:#9db2e6; --warn:#f0b35a; --warn-bg:#2d2414; --ok:#6fd08f; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#121415; --surface:#1b1e20; --ink:#eef0f0; --muted:#a3aaad; --line:#30363a; --soft:#24282b;
+  --dh:#ff5c5c; --tcr:#3cc3cc; --tj:#9db2e6; --warn:#f0b35a; --warn-bg:#2d2414; --ok:#6fd08f; color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:15px;line-height:1.5}
+.wrap{max-width:960px;margin:0 auto;padding-block:28px 56px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));display:grid;gap:22px}
+header{display:grid;gap:6px}
+.eyebrow{font-family:var(--f-mono);font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+h1{margin:0;font-size:clamp(26px,4vw,34px);font-weight:800;letter-spacing:-.01em;text-wrap:balance}
+.lede{margin:0;color:var(--muted);max-width:65ch}
+h2{margin:0;font-size:17px;font-weight:700;text-wrap:balance}
+.steps{margin:0;padding-left:20px;color:var(--muted);display:grid;gap:2px;max-width:70ch}
+.steps b{color:var(--ink);font-weight:600}
+.input{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:18px;display:grid;gap:14px}
+.drop{border:2px dashed var(--line);border-radius:6px;padding:22px 16px;text-align:center;display:grid;gap:8px;justify-items:center;transition:border-color .15s,background .15s}
+.drop.over{border-color:var(--tcr);background:var(--soft)}
+.drop p{margin:0;color:var(--muted)}
+.btn{font:600 14px var(--f-body);border-radius:4px;padding:9px 16px;cursor:pointer;border:2px solid var(--ink);background:var(--ink);color:var(--bg)}
+.btn.ghost{background:transparent;color:var(--ink)}
+.btn:focus-visible,textarea:focus-visible{outline:3px solid var(--tcr);outline-offset:2px}
+.btn:hover{opacity:.9}
+textarea{width:100%;min-height:120px;resize:vertical;font:12.5px/1.45 var(--f-mono);color:var(--ink);background:var(--soft);border:1px solid var(--line);border-radius:4px;padding:10px;white-space:pre;overflow:auto}
+.row{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+.status{font-size:14px;color:var(--muted)}
+.status.err{color:var(--dh)}
+.example{display:inline-block;font:600 11px var(--f-mono);letter-spacing:.06em;text-transform:uppercase;background:var(--warn-bg);color:var(--warn);padding:3px 8px;border-radius:3px}
+.summary{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
+.tile{background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:12px 14px;border-top:4px solid var(--c,var(--muted))}
+.tile .n{font:600 26px var(--f-mono);font-variant-numeric:tabular-nums}
+.tile .l{font-size:13px;color:var(--muted)}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:8px;overflow:hidden}
+.panel-head{display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between;padding:12px 16px;border-bottom:1px solid var(--line);border-left:6px solid var(--c)}
+.code{font:600 12px var(--f-mono);color:var(--c);letter-spacing:.06em}
+.tbl{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:14px}
+th,td{text-align:left;padding:8px 16px;border-bottom:1px solid var(--line);white-space:nowrap}
+th{font:600 11px var(--f-mono);letter-spacing:.08em;text-transform:uppercase;color:var(--muted);background:var(--soft)}
+td.mono{font-family:var(--f-mono);font-size:13px}
+tr:last-child td{border-bottom:0}
+.empty{padding:14px 16px;color:var(--muted)}
+.warnbox{background:var(--warn-bg);color:var(--ink);border:1px solid var(--line);border-left:6px solid var(--warn);border-radius:8px;padding:12px 16px;display:grid;gap:6px}
+.warnbox ul{margin:0;padding-left:18px}
+.copied{color:var(--ok);font-size:13px;font-weight:600}
+.note{font-size:13px;color:var(--muted);max-width:70ch;margin:0}
+@media (max-width:620px){.summary{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+
+
+<div class="wrap">
+  <header>
+    <div class="eyebrow">Circulation &amp; Subscription Services</div>
+    <h1>New Start Email Sorter</h1>
+    <p class="lede">Drop in the Newzware New Subscription Starts report. This pulls out each subscriber's name and email, sorts them by paper, and gives you the email addresses ready to paste into Gmail.</p>
+  </header>
+
+  <ol class="steps">
+    <li><b>Run</b> the New Start report in Newzware and save it as a PDF or text file.</li>
+    <li><b>Drop</b> the file below, or copy the report text and paste it in.</li>
+    <li><b>Copy</b> each paper's emails and paste them into the Bcc line of that paper's welcome email in Gmail.</li>
+    <li><b>Send</b> it, with your own address in To.</li>
+  </ol>
+
+  <section class="input" aria-label="Report input">
+    <div class="drop" id="drop">
+      <strong>Drop the report file here</strong>
+      <p>PDF or text file (.pdf, .txt). It stays on this computer; nothing is uploaded.</p>
+      <div class="row" style="justify-content:center">
+        <label class="btn" for="file" tabindex="0">Choose file</label>
+        <input id="file" type="file" accept=".pdf,.txt,.prn,.lst,text/plain,application/pdf" hidden multiple>
+      </div>
+    </div>
+    <label for="paste" class="status">Or paste the report text:</label>
+    <textarea id="paste" spellcheck="false" placeholder="Paste the report here"></textarea>
+    <div class="row">
+      <button class="btn" id="run" type="button">Sort emails</button>
+      <button class="btn ghost" id="clear" type="button">Clear</button>
+      <span class="status" id="status" role="status"></span>
+    </div>
+  </section>
+
+  <div id="exampleNote" class="row"><span class="example">Example data</span><span class="note">These rows are made up to show how it works. Drop in your report to replace them.</span></div>
+
+  <section class="summary" id="summary" aria-label="Totals"></section>
+  <div id="warn"></div>
+  <div id="panels" style="display:grid;gap:18px"></div>
+
+  <p class="note">Copy emails for Gmail Bcc gives a comma-separated list of addresses. Copy full list gives email, first and last name as a spreadsheet-ready list. Duplicate emails are removed. Subscribers with no email on file are listed separately so you can follow up by phone or mail.</p>
+</div>
+
+<script>
+const PAPERS=[
+  {code:"DH", name:"Durango Herald", color:"var(--dh)"},
+  {code:"TCR",name:"Tri-City Record",color:"var(--tcr)"},
+  {code:"TJ", name:"The Journal",    color:"var(--tj)"}
+];
+const CODES=PAPERS.map(p=>p.code);
+const EMAIL_RE=/[A-Za-z0-9._%+'\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}/;
+const REC_RE=/^\s*(\d{3,})\s+(\d+)\s+(\S+)\s+(.*)$/;
+
+function titleCase(s){
+  return s.toLowerCase().replace(/(^|[\s\-'])([a-z])/g,(m,a,b)=>a+b.toUpperCase())
+    .replace(/\bMc([a-z])/g,(m,c)=>"Mc"+c.toUpperCase());
+}
+function splitName(raw){
+  raw=(raw||"").replace(/\s+/g," ").trim();
+  if(!raw) return {first:"",last:""};
+  const i=raw.indexOf(",");
+  if(i<0) return {first:"",last:titleCase(raw)};
+  return {last:titleCase(raw.slice(0,i).trim()),first:titleCase(raw.slice(i+1).trim())};
+}
+function findCols(lines){
+  for(const l of lines){
+    if(/SUB NUM/.test(l)&&/\bName\b/.test(l)&&/\bAddress\b/.test(l)){
+      const ed=l.search(/\bEd\b/);
+      return {name:l.indexOf("Name"),addr:l.indexOf("Address"),ed:ed>=0?ed:-1};
+    }
+  }
+  return null;
+}
+function editionFrom(line,cols,fallback){
+  if(cols&&cols.ed>=0){
+    const seg=line.slice(Math.max(0,cols.ed-2),cols.ed+5).toUpperCase();
+    const m=seg.match(/\b(TCR|DH|TJ)\b/); if(m) return m[1];
+  }
+  // fallback: the edition code is the one followed by ISS, DEL, PAY, copy count
+  const re=/\b(TCR|DH|TJ)\b(?=\s+\S+\s+\S+\s+\S+\s+\d+\s)/g; let m,last=null;
+  while((m=re.exec(line))) last=m[1];
+  return last||fallback||"";
+}
+function nameFrom(line,rest,cols){
+  if(cols&&cols.name>=0&&cols.addr>cols.name&&line.length>cols.name){
+    const n=line.slice(cols.name,cols.addr).trim(); if(n) return n;
+  }
+  const m=rest.match(/^([A-Z][A-Z'\.\-]*(?: [A-Z][A-Z'\.\-]*)*,\s*[A-Z][A-Z'\.\-]*)/);
+  return m?m[1]:rest.split(/\s{2,}/)[0];
+}
+function parseReport(text){
+  const lines=text.replace(/\r/g,"").split("\n");
+  const cols=findCols(lines);
+  const edHdr=(text.match(/Editions:\s*(TCR|DH|TJ)\b/)||[])[1]||"";
+  const recs=[];
+  let cur=null;
+  for(const line of lines){
+    const m=line.match(REC_RE);
+    if(m && /\d{4}-\d{2}-\d{2}/.test(line)){
+      cur={sub:m[1],raw:nameFrom(line,m[4],cols),ed:editionFrom(line,cols,edHdr),email:""};
+      const e=line.match(EMAIL_RE); if(e) cur.email=e[0];
+      recs.push(cur); continue;
+    }
+    if(cur&&!cur.email){const e=line.match(EMAIL_RE); if(e) cur.email=e[0];}
+    if(/^\s*\d{1,2}\/\d{1,2}\/\d{4}\s/.test(line)||/BALLANTINE|New Subscription Starts|SUB NUM/.test(line)) cur=null;
+  }
+  const seen=new Set(), out={missing:[],unknown:[]};
+  CODES.forEach(c=>out[c]=[]);
+  for(const r of recs){
+    const n=splitName(r.raw);
+    const row={sub:r.sub,first:n.first,last:n.last,email:r.email.toLowerCase(),ed:r.ed};
+    if(!row.email){out.missing.push(row);continue;}
+    if(seen.has(row.email)) continue; seen.add(row.email);
+    (out[row.ed]||out.unknown).push(row);
+  }
+  out.total=recs.length;
+  return out;
+}
+window.parseReport=parseReport;
+
+/* ---------- PDF → fixed-width text ---------- */
+async function pdfToText(buf){
+  if(!window.pdfjsLib) throw new Error("The PDF reader didn't load. Copy the report text and paste it in instead.");
+  const doc=await pdfjsLib.getDocument({data:buf}).promise;
+  const fwd=[], rev=[];
+  const med=a=>{a=a.filter(v=>v>0).sort((x,y)=>x-y);return a.length?a[Math.floor(a.length/2)]:0;};
+  for(let p=1;p<=doc.numPages;p++){
+    const page=await doc.getPage(p);
+    const vp=page.getViewport({scale:1});
+    const tc=await page.getTextContent();
+    const items=tc.items.filter(i=>i.str&&i.str.trim()).map(i=>{
+      const t=pdfjsLib.Util.transform(vp.transform,i.transform);
+      return {str:i.str,len:i.str.length,w:i.width,x:t[4],y:t[5],ang:Math.atan2(t[1],t[0]),h:Math.hypot(t[2],t[3])};
+    });
+    if(!items.length) continue;
+    // Use the most common text direction so rotated (landscape) reports read across, not down
+    const buckets={};items.forEach(i=>{const k=Math.round(i.ang/(Math.PI/2));buckets[k]=(buckets[k]||0)+1;});
+    const k=+Object.keys(buckets).sort((a,b)=>buckets[b]-buckets[a])[0];
+    const a=k*Math.PI/2, c=Math.cos(a), sn=Math.sin(a);
+    items.forEach(i=>{i.along=i.x*c+i.y*sn; i.across=-i.x*sn+i.y*c;});
+    const cw=med(items.filter(i=>i.len>2).map(i=>Math.abs(i.w)/i.len))||5;
+    const tol=(med(items.map(i=>i.h))||10)*0.5;
+    items.sort((p1,p2)=>p1.across-p2.across);
+    const rows=[];
+    for(const it of items){
+      const r=rows[rows.length-1];
+      if(r&&Math.abs(it.across-r.y)<=tol) r.items.push(it); else rows.push({y:it.across,items:[it]});
+    }
+    const minAlong=Math.min(...items.map(i=>i.along));
+    const lines=rows.map(r=>{
+      let line="";
+      r.items.sort((p1,p2)=>p1.along-p2.along).forEach(it=>{
+        const col=Math.max(0,Math.round((it.along-minAlong)/cw));
+        if(line.length<col) line=line.padEnd(col," "); else if(line.length&&!line.endsWith(" ")) line+=" ";
+        line+=it.str;
+      });
+      return line;
+    });
+    fwd.push(...lines); rev.push(...lines.slice().reverse());
+  }
+  const t1=fwd.join("\n"), t2=rev.join("\n");
+  const score=t=>{const r=parseReport(t);return CODES.reduce((n,c)=>n+r[c].length,0)+r.unknown.length+r.total*0.1;};
+  return score(t2)>score(t1)?t2:t1;
+}
+
+/* ---------- UI ---------- */
+const $=id=>document.getElementById(id);
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+function csvCell(v){v=String(v||"");return /[",\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v;}
+function toCsv(rows){return ["EMAIL,FIRSTNAME,LASTNAME"].concat(rows.map(r=>[r.email,r.first,r.last].map(csvCell).join(","))).join("\n");}
+
+function render(res,isExample){
+  LAST=res;
+  $("exampleNote").hidden=!isExample;
+  const withEmail=CODES.reduce((s,c)=>s+res[c].length,0)+res.unknown.length;
+  $("summary").innerHTML=PAPERS.map(p=>`<div class="tile" style="--c:${p.color}"><div class="n">${res[p.code].length}</div><div class="l">${p.name} (${p.code})</div></div>`).join("")+
+    `<div class="tile" style="--c:var(--warn)"><div class="n">${res.missing.length}</div><div class="l">No email on file</div></div>`;
+  let w="";
+  if(res.missing.length) w+=`<div class="warnbox"><strong>${res.missing.length} subscriber${res.missing.length>1?"s have":" has"} no email address</strong><ul>${res.missing.map(r=>`<li>${esc(r.first)} ${esc(r.last)} · Sub #${esc(r.sub)} · ${esc(r.ed||"paper unknown")}</li>`).join("")}</ul></div>`;
+  if(res.unknown.length) w+=`<div class="warnbox"><strong>${res.unknown.length} email${res.unknown.length>1?"s":""} without a TCR, DH or TJ code</strong><ul>${res.unknown.map(r=>`<li>${esc(r.email)} · Sub #${esc(r.sub)}</li>`).join("")}</ul></div>`;
+  if(!res.total) w=`<div class="warnbox"><strong>No subscribers found</strong><span>Check that this is the New Subscription Starts report. If you dropped a PDF, try copying the report text and pasting it in.</span></div>`;
+  $("warn").innerHTML=w;
+  $("panels").innerHTML=PAPERS.map(p=>{
+    const rows=res[p.code];
+    return `<section class="panel" style="--c:${p.color}">
+      <div class="panel-head"><div><h2>${p.name}</h2><span class="code">${p.code} · ${rows.length} email${rows.length===1?"":"s"}</span></div>
+      <div class="row"><span class="copied" id="ok-${p.code}" hidden>Copied</span>
+      <button class="btn" type="button" data-bcc="${p.code}" ${rows.length?"":"disabled"} style="background:${p.color};border-color:${p.color};color:#fff">Copy emails for Gmail Bcc</button>
+      <button class="btn ghost" type="button" data-copy="${p.code}" ${rows.length?"":"disabled"}>Copy full list</button></div></div>
+      ${rows.length?`<div class="tbl"><table><thead><tr><th>First</th><th>Last</th><th>Email</th><th>Sub #</th></tr></thead><tbody>${rows.map(r=>`<tr><td>${esc(r.first)}</td><td>${esc(r.last)}</td><td class="mono">${esc(r.email)}</td><td class="mono">${esc(r.sub)}</td></tr>`).join("")}</tbody></table></div>
+      <textarea id="csv-${p.code}" readonly aria-label="${p.name} full list" style="border:0;border-top:1px solid var(--line);border-radius:0;min-height:90px">${esc(toCsv(rows))}</textarea>`
+      :`<div class="empty">No new ${p.name} subscribers with an email in this report.</div>`}
+    </section>`;
+  }).join("");
+  $("status").textContent=isExample?"":`Found ${res.total} new start${res.total===1?"":"s"}, ${withEmail} with email.`;
+  $("status").className="status";
+}
+let LAST=null;
+document.addEventListener("click",async e=>{
+  const b=e.target.closest("[data-copy],[data-bcc]"); if(!b) return;
+  const code=b.dataset.copy||b.dataset.bcc, ta=$("csv-"+code);
+  const text=b.dataset.bcc?LAST[code].map(r=>r.email).join(", "):ta.value;
+  try{await navigator.clipboard.writeText(text);}catch(_){ta.value=text;ta.focus();ta.select();try{document.execCommand("copy");}catch(__){}}
+  const ok=$("ok-"+code); ok.hidden=false; setTimeout(()=>ok.hidden=true,2000);
+});
+async function readFiles(files){
+  $("status").textContent="Reading…";$("status").className="status";
+  try{
+    let text="";
+    for(const f of files){
+      if(/\.pdf$/i.test(f.name)||f.type==="application/pdf") text+=await pdfToText(await f.arrayBuffer())+"\n";
+      else text+=await f.text()+"\n";
+    }
+    $("paste").value=text;
+    render(parseReport(text),false);
+  }catch(err){$("status").textContent=err.message||"That file couldn't be read. Try pasting the report text instead.";$("status").className="status err";}
+}
+$("file").addEventListener("change",e=>{if(e.target.files.length) readFiles([...e.target.files]);});
+document.querySelector('label[for="file"]').addEventListener("keydown",e=>{if(e.key==="Enter"||e.key===" "){e.preventDefault();$("file").click();}});
+const drop=$("drop");
+["dragenter","dragover"].forEach(t=>drop.addEventListener(t,e=>{e.preventDefault();drop.classList.add("over");}));
+["dragleave","drop"].forEach(t=>drop.addEventListener(t,e=>{e.preventDefault();drop.classList.remove("over");}));
+drop.addEventListener("drop",e=>{const f=[...e.dataTransfer.files];if(f.length) readFiles(f);});
+$("run").addEventListener("click",()=>{const t=$("paste").value;if(!t.trim()){$("status").textContent="Paste the report text or drop a file first.";$("status").className="status err";return;}render(parseReport(t),false);});
+$("clear").addEventListener("click",()=>{$("paste").value="";render(parseReport(EXAMPLE),true);});
+
+const EXAMPLE=`                                                 New Subscription Starts
+ SUB NUM  DIST Route    Name               Address                   CITY  STATE  ZIPCODE    STARTED    Remark          PROMOTION  Ed  ISS  DEL  PAY  Copy SUBMIT    Type
+ -------- ---- -------- ------------------ ------------------------- --------------------- ---------- --------------- ---------- --- ---- ---- ---- ---- ------    --------------------
+    90001   10 INTERNET SAMPLE, ROSA       DIGITAL ADDR 90001        FARMINGTON, NM 87401  2026-10-21 START SUBSCRIPT            TCR MWF  INTE PIO     1 WEB       Start (New)
+                                           rosa.sample@example.com
+    90002   20 C014     EXAMPLE, DAVID     100 SAMPLE ST             DURANGO, CO 81301     2026-10-21 START SUBSCRIPT            DH  DLY  CARR PIO     1 WEB       Start (New)
+                                           d.example@example.com
+    90003   30 INTERNET TESTER, ANN        DIGITAL ADDR 90003        CORTEZ, CO 81321      2026-10-21 START SUBSCRIPT            TJ  DLY  INTE PIO     1 WEB       Start (New)
+                                           ann.tester@example.com
+    90004   20 C022     DEMO, CARLOS       42 EXAMPLE AVE            BAYFIELD, CO 81122    2026-10-21 START SUBSCRIPT            DH  DLY  MAIL PIO     1 PHONE     Start (New)
+`;
+render(parseReport(EXAMPLE),true);
+</script>
+
+</body>
+</html>
